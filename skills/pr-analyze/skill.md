@@ -1,6 +1,6 @@
 ---
 name: pr-analyze
-version: 0.2.0
+version: 0.3.0
 author: 大铭 (https://github.com/yinwm)
 description: |
   Comprehensive PR analysis workflow for GitHub repositories. Use when user provides a PR number or URL and asks for analysis.
@@ -106,7 +106,7 @@ fi
 ### Step 1: 获取 PR 基本信息
 
 ```bash
-gh pr view <PR> --repo <owner/repo> --json title,body,state,author,baseRefName,headRefName,files,additions,deletions,commits,number
+gh pr view <PR> --repo <owner/repo> --json title,body,state,author,baseRefName,headRefName,files,additions,deletions,commits,number,mergeable,mergeStateStatus
 gh pr diff <PR> --repo <owner/repo>
 ```
 
@@ -115,6 +115,11 @@ gh pr diff <PR> --repo <owner/repo>
 - 作者、目标分支、源分支
 - 改动文件列表、增删行数
 - 关联的 Issue（从 body 中提取 `Closes #xxx` 等）
+- **Merge 状态**（CRITICAL）：
+  - `mergeable`: `MERGEABLE` / `CONFLICTING` / `UNKNOWN`
+  - `mergeStateStatus`: `CLEAN` / `DIRTY` / `BLOCKED` / `DRAFT` / `UNSTABLE`
+
+**重要**: 如果 `mergeable` 为 `CONFLICTING` 或 `mergeStateStatus` 为 `DIRTY`，必须在报告中突出显示这是阻塞性问题！
 
 ### Step 2: PR 功能说明
 
@@ -333,7 +338,26 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 ---
 
-## 5. CI 状态
+## 5. Merge 状态（CRITICAL）
+
+✅ 无冲突，可合并
+
+或
+
+⛔ **有 Merge 冲突**：
+- `mergeable`: CONFLICTING
+- `mergeStateStatus`: DIRTY
+- **需要作者 rebase 分支到最新的 main 并解决冲突**
+
+或
+
+⚠️ Merge 状态异常：
+- `mergeable`: {状态}
+- `mergeStateStatus`: {状态}
+
+---
+
+## 6. CI 状态
 
 ✅ CI 通过
 
@@ -345,7 +369,7 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 ---
 
-## 6. 代码审查结果
+## 7. 代码审查结果
 
 > 由 `/review` skill 生成
 
@@ -357,7 +381,7 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 ---
 
-## 7. 总结与建议
+## 8. 总结与建议
 
 ### 最终评估
 
