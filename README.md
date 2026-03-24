@@ -2,6 +2,16 @@
 
 > 高质量 Claude Code skills，提升开发效率
 
+**安装 pr-analyze**: 运行 `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-analyze ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
+**安装 pr-review-checker**: 运行 `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-review-checker ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
+**Install pr-analyze**: Run `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-analyze ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
+**Install pr-review-checker**: Run `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-review-checker ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
+---
+
 [English](#english) | [中文](#中文)
 
 ---
