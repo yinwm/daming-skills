@@ -32,13 +32,13 @@
 
 ### 可用 Skills
 
-| Skill | 描述 | 状态 |
-|-------|------|------|
-| [pr-analyze](./skills/pr-analyze/) | 全面分析 GitHub PR，包括兼容性影响、重复检查、关联 Issue 分析等 | ✅ |
-| [pr-review-checker](./skills/pr-review-checker/) | 智能检查需要你 review 的 PR，过滤出真正需要关注的项目 | ✅ |
-| [github-first-time-prs](./skills/github-first-time-prs/) | 获取首次贡献者的 OPEN PR 列表，关注新人贡献 | ✅ |
-| [github-valuable-prs](./skills/github-valuable-prs/) | 筛选高价值 PR 和 Issue，快速定位优先处理内容 | ✅ |
-| *(更多 skills 敬请期待...)* | | |
+| Skill | 描述 | 状态 | Claude Code / Openclaw 安装 |
+|-------|------|------|---------------------------|
+| [pr-analyze](./skills/pr-analyze/) | 全面分析 GitHub PR，包括兼容性影响、重复检查、关联 Issue 分析等 | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-analyze ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| [pr-review-checker](./skills/pr-review-checker/) | 智能检查需要你 review 的 PR，过滤出真正需要关注的项目 | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-review-checker ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| [github-first-time-prs](./skills/github-first-time-prs/) | 获取首次贡献者的 OPEN PR 列表，关注新人贡献 | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-first-time-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| [github-valuable-prs](./skills/github-valuable-prs/) | 筛选高价值 PR 和 Issue，快速定位优先处理内容 | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-valuable-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| *(更多 skills 敬请期待...)* | | | |
 
 ### 快速开始
 
@@ -102,13 +102,13 @@ A collection of high-quality Claude Code skills by Daming (@yinwm). Each skill i
 
 ### Available Skills
 
-| Skill | Description | Status |
-|-------|-------------|--------|
-| [pr-analyze](./skills/pr-analyze/) | Comprehensive GitHub PR analysis including compatibility impact, duplicate checks, and related issue analysis | ✅ |
-| [pr-review-checker](./skills/pr-review-checker/) | Intelligent PR review checklist that filters PRs needing your attention | ✅ |
-| [github-first-time-prs](./skills/github-first-time-prs/) | Get list of OPEN PRs from first-time contributors, help new contributors | ✅ |
-| [github-valuable-prs](./skills/github-valuable-prs/) | Filter high-value PRs and Issues, quickly find priority items | ✅ |
-| *(More coming soon...)* | | |
+| Skill | Description | Status | Claude Code / Openclaw Install |
+|-------|-------------|--------|------------------------------|
+| [pr-analyze](./skills/pr-analyze/) | Comprehensive GitHub PR analysis including compatibility impact, duplicate checks, and related issue analysis | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-analyze ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| [pr-review-checker](./skills/pr-review-checker/) | Intelligent PR review checklist that filters PRs needing your attention | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-review-checker ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| [github-first-time-prs](./skills/github-first-time-prs/) | Get list of OPEN PRs from first-time contributors, help new contributors | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-first-time-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| [github-valuable-prs](./skills/github-valuable-prs/) | Filter high-value PRs and Issues, quickly find priority items | ✅ | `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-valuable-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills` |
+| *(More coming soon...)* | | | |
 
 ### Quick Start
 
