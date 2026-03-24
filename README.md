@@ -6,9 +6,17 @@
 
 **安装 pr-review-checker**: 运行 `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-review-checker ~/.claude/skills/ && rm -rf /tmp/daming-skills`
 
+**安装 github-first-time-prs**: 运行 `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-first-time-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
+**安装 github-valuable-prs**: 运行 `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-valuable-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
 **Install pr-analyze**: Run `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-analyze ~/.claude/skills/ && rm -rf /tmp/daming-skills`
 
 **Install pr-review-checker**: Run `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/pr-review-checker ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
+**Install github-first-time-prs**: Run `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-first-time-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills`
+
+**Install github-valuable-prs**: Run `git clone https://github.com/yinwm/daming-skills.git /tmp/daming-skills && cp -r /tmp/daming-skills/skills/github-valuable-prs ~/.claude/skills/ && rm -rf /tmp/daming-skills`
 
 ---
 
@@ -28,6 +36,8 @@
 |-------|------|------|
 | [pr-analyze](./skills/pr-analyze/) | 全面分析 GitHub PR，包括兼容性影响、重复检查、关联 Issue 分析等 | ✅ |
 | [pr-review-checker](./skills/pr-review-checker/) | 智能检查需要你 review 的 PR，过滤出真正需要关注的项目 | ✅ |
+| [github-first-time-prs](./skills/github-first-time-prs/) | 获取首次贡献者的 OPEN PR 列表，关注新人贡献 | ✅ |
+| [github-valuable-prs](./skills/github-valuable-prs/) | 筛选高价值 PR 和 Issue，快速定位优先处理内容 | ✅ |
 | *(更多 skills 敬请期待...)* | | |
 
 ### 快速开始
@@ -38,6 +48,8 @@
 # 复制 skill 到你的 Claude Code skills 目录
 cp -r skills/pr-analyze ~/.claude/skills/
 cp -r skills/pr-review-checker ~/.claude/skills/
+cp -r skills/github-first-time-prs ~/.claude/skills/
+cp -r skills/github-valuable-prs ~/.claude/skills/
 
 # 如需配置（首次使用时会自动提示配置）
 ```
@@ -59,7 +71,8 @@ cp -r skills/* ~/.claude/skills/
 
 - **pr-analyze**: 需要设置报告存储目录
 - **pr-review-checker**: 需要设置仓库和 GitHub 用户名
-- **gstack skills**: 需要安装 `gstack` CLI
+- **github-first-time-prs**: 需要设置检查的仓库
+- **github-valuable-prs**: 需要设置仓库和默认时间范围
 
 详见各 skill 目录下的文档。
 
@@ -67,6 +80,8 @@ cp -r skills/* ~/.claude/skills/
 
 - **pr-analyze**: 依赖 `gh` CLI（GitHub CLI）和 `/review` skill
 - **pr-review-checker**: 依赖 `gh` CLI 和 `jq`
+- **github-first-time-prs**: 依赖 `gh` CLI
+- **github-valuable-prs**: 依赖 `gh` CLI
 - 其他 skills 可能有自己的依赖，请查看具体文档
 
 ### 贡献
@@ -91,6 +106,8 @@ A collection of high-quality Claude Code skills by Daming (@yinwm). Each skill i
 |-------|-------------|--------|
 | [pr-analyze](./skills/pr-analyze/) | Comprehensive GitHub PR analysis including compatibility impact, duplicate checks, and related issue analysis | ✅ |
 | [pr-review-checker](./skills/pr-review-checker/) | Intelligent PR review checklist that filters PRs needing your attention | ✅ |
+| [github-first-time-prs](./skills/github-first-time-prs/) | Get list of OPEN PRs from first-time contributors, help new contributors | ✅ |
+| [github-valuable-prs](./skills/github-valuable-prs/) | Filter high-value PRs and Issues, quickly find priority items | ✅ |
 | *(More coming soon...)* | | |
 
 ### Quick Start
@@ -101,6 +118,8 @@ A collection of high-quality Claude Code skills by Daming (@yinwm). Each skill i
 # Copy skill to your Claude Code skills directory
 cp -r skills/pr-analyze ~/.claude/skills/
 cp -r skills/pr-review-checker ~/.claude/skills/
+cp -r skills/github-first-time-prs ~/.claude/skills/
+cp -r skills/github-valuable-prs ~/.claude/skills/
 
 # Configuration if needed (you'll be prompted on first use)
 ```
@@ -122,7 +141,8 @@ Some skills require configuration:
 
 - **pr-analyze**: Requires setting report storage directory
 - **pr-review-checker**: Requires setting repository and GitHub username
-- **gstack skills**: Requires `gstack` CLI installation
+- **github-first-time-prs**: Requires setting repository to check
+- **github-valuable-prs**: Requires setting repository and default time range
 
 See individual skill documentation for details.
 
@@ -130,6 +150,8 @@ See individual skill documentation for details.
 
 - **pr-analyze**: Requires `gh` CLI (GitHub CLI) and `/review` skill
 - **pr-review-checker**: Requires `gh` CLI and `jq`
+- **github-first-time-prs**: Requires `gh` CLI
+- **github-valuable-prs**: Requires `gh` CLI
 - Other skills may have their own dependencies
 
 ### Contributing
