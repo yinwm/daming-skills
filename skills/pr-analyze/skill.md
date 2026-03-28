@@ -1,6 +1,6 @@
 ---
 name: pr-analyze
-version: 0.3.0
+version: 0.4.0
 author: 大铭 (https://github.com/yinwm)
 description: |
   Comprehensive PR analysis workflow for GitHub repositories. Use when user provides a PR number or URL and asks for analysis.
@@ -387,10 +387,13 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 {对 PR 的整体评价，是否建议合并}
 
-### 建议改进项
+### 需作者修复的问题（blocking）
 
-1. ...
-2. ...
+{列出阻塞合并的问题，格式为可直接贴给作者的 review 内容}
+
+### 建议改进（non-blocking）
+
+{列出非阻塞建议，供作者参考}
 
 ### 可选扩展
 
@@ -398,7 +401,41 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 ---
 
-*报告由 [大铭](https://github.com/yinwm) 的 `/pr-analyze` 生成 (v0.2.0)*
+## 9. Review 操作建议
+
+**重要：用户是 PR 的 reviewer，不能修改代码。以下内容供 reviewer 直接使用。**
+
+### 推荐操作
+
+{APPROVE / REQUEST CHANGES / COMMENT}
+
+### 可直接使用的 Review 评论
+
+{生成一段完整的 review 评论文本，reviewer 可以直接复制粘贴到 GitHub PR review 中。格式为英文或中文（根据 PR 作者语言判断）。内容应包含：
+- 肯定 PR 的价值
+- 列出需要作者修复的问题（blocking）
+- 列出建议但非必须的改进（non-blocking）
+- 明确的后续步骤（如 rebase、修缩进等）
+}
+
+### 可执行的 gh 命令
+
+如果 reviewer 确认要提交 review，提供可直接执行的命令：
+
+```bash
+# Request changes（有 blocking 问题时）
+gh pr review {number} --repo {owner}/{repo} --request-changes --body "..."
+
+# Approve（无 blocking 问题时）
+gh pr review {number} --repo {owner}/{repo} --approve --body "..."
+
+# 仅评论（不需要 approve/request changes 时）
+gh pr comment {number} --repo {owner}/{repo} --body "..."
+```
+
+---
+
+*报告由 [大铭](https://github.com/yinwm) 的 `/pr-analyze` 生成 (v0.4.0)*
 ```
 
 **3. 保存报告到文件：**
