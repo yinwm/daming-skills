@@ -10,20 +10,23 @@
 
 对 GitHub PR 进行全面分析，生成结构化中文报告：
 
-- PR 功能说明
+- PR 功能说明 + TL;DR 摘要
 - 兼容性影响分析（前端、API、依赖、数据库、配置）
-- 重复 PR 检查
 - 关联 Issue 与 PR 分析
-- CI 状态检查
-- 自动代码审查（调用 `/review` skill）
+- Merge 状态 + CI 状态检查
+- 已有 Review 评论分析（不重复已有发现）
+- 深度代码审查：
+  - 数据流追踪（roundtrip 一致性验证）
+  - CRITICAL 检查（安全、并发、数据完整性）
+  - INFORMATIONAL 检查（可维护性、性能、测试）
+  - 对抗性审查（独立子 agent 找盲区）
+- 范围漂移检测
+- 交互式操作（approve / request changes / 评论）
 
 ### 安装
 
 ```bash
-# 复制 skill 到 Claude Code skills 目录
-cp -r pr-analyze ~/.claude/skills/
-
-# 或从仓库根目录安装
+# 从仓库根目录安装
 cp -r skills/pr-analyze ~/.claude/skills/
 ```
 
@@ -44,7 +47,6 @@ cp config.example.json ~/.claude/skills/pr-analyze/config.json
 ### 依赖
 
 - **gh CLI**: [GitHub CLI](https://cli.github.com/)
-- **/review skill**: 用于代码审查
 
 ### 使用示例
 
@@ -76,20 +78,23 @@ cp config.example.json ~/.claude/skills/pr-analyze/config.json
 
 Comprehensive GitHub PR analysis with structured Chinese reports:
 
-- PR purpose summary
+- PR purpose summary + TL;DR
 - Compatibility impact analysis (frontend, API, dependencies, database, config)
-- Duplicate PR detection
 - Related issues and PRs analysis
-- CI status checks
-- Automated code review (via `/review` skill)
+- Merge status + CI status checks
+- Existing review analysis (no duplicate findings)
+- Deep code review:
+  - Data flow tracing (roundtrip consistency verification)
+  - CRITICAL checks (security, concurrency, data integrity)
+  - INFORMATIONAL checks (maintainability, performance, testing)
+  - Adversarial review (independent sub-agent for blind spots)
+- Scope drift detection
+- Interactive actions (approve / request changes / comment)
 
 ### Installation
 
 ```bash
-# Copy skill to Claude Code skills directory
-cp -r pr-analyze ~/.claude/skills/
-
-# Or from repository root
+# From repository root
 cp -r skills/pr-analyze ~/.claude/skills/
 ```
 
@@ -98,19 +103,14 @@ cp -r skills/pr-analyze ~/.claude/skills/
 You'll be prompted on first use, or manually create config:
 
 ```bash
-# Create config directory
 mkdir -p ~/.claude/skills/pr-analyze
-
-# Copy example config
 cp config.example.json ~/.claude/skills/pr-analyze/config.json
-
 # Edit config, set report_dir to your preferred path
 ```
 
 ### Dependencies
 
 - **gh CLI**: [GitHub CLI](https://cli.github.com/)
-- **/review skill**: For code review
 
 ### Usage Examples
 
@@ -128,13 +128,7 @@ Reports are saved to configured directory with naming:
 {report_dir}/{repo_slug}/pr-{number}-{YYYYMMDD}-{HHMMSS}.md
 ```
 
-Example:
-
-```
-~/pr-reports/sipeed-picoclaw/pr-1900-20260323-071500.md
-```
-
 ---
 
 **Author**: 大铭 (https://github.com/yinwm)
-**Version**: 0.2.0
+**Version**: 0.6.0

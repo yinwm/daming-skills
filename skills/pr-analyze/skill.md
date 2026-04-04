@@ -1,6 +1,6 @@
 ---
 name: pr-analyze
-version: 0.4.0
+version: 0.6.0
 author: 大铭 (https://github.com/yinwm)
 description: |
   Comprehensive PR analysis workflow for GitHub repositories. Use when user provides a PR number or URL and asks for analysis.
@@ -45,16 +45,10 @@ compatibility: Requires `gh` CLI (GitHub CLI)
 
 ### 检查与初始化配置
 
-**每次运行时执行：**
+**每次运行时最先执行（Step 0）：**
 
 ```bash
-CONFIG_FILE="$HOME/.claude/skills/pr-analyze/config.json"
-
-if [ ! -f "$CONFIG_FILE" ]; then
-  # 首次运行，询问用户
-  echo "首次运行 pr-analyze，需要设置报告存储目录"
-  # 使用 AskUserQuestion 询问用户
-fi
+cat ~/.claude/skills/pr-analyze/config.json 2>/dev/null || echo "NOT_FOUND"
 ```
 
 **首次运行流程：**
@@ -103,175 +97,194 @@ fi
 
 ## 分析流程
 
-### Step 1: 获取 PR 基本信息
+### Step 0: 检查配置
+
+**在开始任何分析之前执行。** 检查配置文件是否存在，不存在则引导用户配置。
+
+### Step 1: 获取 PR 元数据 + diff + CI
 
 ```bash
 gh pr view <PR> --repo <owner/repo> --json title,body,state,author,baseRefName,headRefName,files,additions,deletions,commits,number,mergeable,mergeStateStatus
 gh pr diff <PR> --repo <owner/repo>
+gh pr checks <PR> --repo <owner/repo> || gh pr view <PR> --repo <owner/repo> --json statusCheckRollup
 ```
+
+将基本信息获取、diff 和 CI 检查合并为一次并行调用，减少轮次。
 
 提取：
 - 标题、描述、状态（OPEN/MERGED/CLOSED）
 - 作者、目标分支、源分支
 - 改动文件列表、增删行数
 - 关联的 Issue（从 body 中提取 `Closes #xxx` 等）
-- **Merge 状态**（CRITICAL）：
+- **Merge 状态**：
   - `mergeable`: `MERGEABLE` / `CONFLICTING` / `UNKNOWN`
   - `mergeStateStatus`: `CLEAN` / `DIRTY` / `BLOCKED` / `DRAFT` / `UNSTABLE`
+- CI 检查结果
 
 **重要**: 如果 `mergeable` 为 `CONFLICTING` 或 `mergeStateStatus` 为 `DIRTY`，必须在报告中突出显示这是阻塞性问题！
 
-### Step 2: PR 功能说明
+### Step 2: 读取已有评论和 reviews
 
-用 1-2 句话概括 PR 的核心目的：
-- 这个 PR 解决了什么问题？
-- 主要改动是什么？
+**目的**：不重复已有发现，识别未覆盖的审查角度。
 
-如果有关联 Issue，获取 Issue 信息：
 ```bash
-gh issue view <ISSUE_NUM> --repo <owner/repo> --json title,body,state
+# Review comments（行内代码评论）
+gh api repos/{owner}/{repo}/pulls/{number}/comments
+
+# Reviews（整体 review）
+gh api repos/{owner}/{repo}/pulls/{number}/reviews
+
+# Issue comments（PR 主体评论）
+gh api repos/{owner}/{repo}/issues/{number}/comments
 ```
 
-### Step 3: 兼容性影响分析
+**处理**：
+1. 按评论者分组，提取关键发现
+2. 标记已发现的问题（主审查不重复）
+3. 识别未覆盖的角度（补充审查重点）
+4. 记入报告"已有 Review"章节
 
-评估以下维度：
+**如果 API 返回空列表或失败**：跳过此步骤，不影响后续流程。
+
+### Step 3: Clone PR 到临时目录
+
+**目的**：获得完整源码，使数据流追踪和跨文件分析成为可能。
+
+```bash
+# 创建临时目录（含 PR 编号，方便识别）
+TMPDIR=$(mktemp -d "/tmp/pr-analyze-${PR_NUMBER}-XXXXXXXX")
+
+# 浅克隆仓库
+git clone --depth 1 "https://github.com/${OWNER}/${REPO}.git" "$TMPDIR/repo"
+
+# Fetch PR head ref 并 checkout
+cd "$TMPDIR/repo"
+git fetch origin "refs/pull/${PR_NUMBER}/head:pr-${PR_NUMBER}"
+git checkout "pr-${PR_NUMBER}"
+```
+
+**后续所有代码审查步骤（Step 4）基于此目录的完整源码进行。**
+
+**如果 clone 失败**（私有仓库权限、网络问题等）：回退到仅基于 diff 的审查模式，并在报告中注明"源码获取失败，审查基于 diff only"。
+
+### Step 4: 代码审查
+
+**读取 `~/.claude/skills/pr-analyze/checklist.md`。如果文件不存在，停止并报错。**
+
+#### Step 4a: 数据流追踪
+
+**这是最关键的新增步骤。** 从 diff 中识别数据表示变换点，用完整源码追踪每个变换的 roundtrip。
+
+**通用步骤**：
+
+1. **从 diff 中识别变换函数** — 找所有做格式转换的函数/方法（输入一种类型，输出另一种类型）
+2. **从 diff 中识别存储操作** — 找所有写入持久化的地方（数据库、文件、缓存）
+3. **用完整源码追踪完整路径** — 对每个变换点，从写入端追踪到存储层，再从存储层追踪到读出端
+4. **验证 roundtrip 一致性** — 写入时存储了什么，读出时是否完整还原
+
+**检查项**：
+- 数据经变换后是否丢失字段？
+- 存储操作是否静默丢弃部分输入？
+- 读出时是否假设了写入时没有保证的不变量？
+- 并发读写时数据是否一致？
+
+#### Step 4b: Pass 1 — CRITICAL
+
+按 checklist.md 中的 CRITICAL 类别逐项检查：
+
+- 数据安全（注入、原子性、N+1）
+- 并发安全（竞态、原子操作）
+- 信任边界（外部输入验证、SSRF、XSS）
+- 命令/代码注入
+- 数据完整性（枚举值覆盖）
+
+**数据完整性检查必须读取 diff 之外的代码**：当 diff 引入新的枚举值/状态/类型常量时，用 Grep 搜索所有引用同类值的位置，用 Read 逐一检查新值是否被处理。
+
+#### Step 4c: Pass 2 — INFORMATIONAL
+
+按 checklist.md 中的 INFORMATIONAL 类别逐项检查：
+
+- 可维护性（文件长度、职责分离）
+- 错误处理（静默吞错、终止条件）
+- 性能（批量操作、内存泄漏）
+- 兼容性（接口签名、配置默认值）
+- 测试（覆盖度、边界条件）
+- 范围漂移（实际改动 vs 声明意图）
+
+#### Step 4d: 对抗性审查（独立子 agent）
+
+**目的**：独立视角找主审查者盲区。
+
+通过 Agent tool 启动一个独立子 agent（`subagent_type: "general-purpose"`），子 agent 没有主审查的上下文。
+
+**子 agent prompt**：
+
+```
+你是一个对抗性代码审查员。对以下 PR 进行独立审查。
+
+PR diff 获取方式：cd {临时目录} && git diff {base_branch}...HEAD
+完整源码位置：{临时目录}
+
+你的任务是找到主审查者可能遗漏的问题。以攻击者和混沌工程师的视角审查。
+
+重点检查：
+- 边界条件和异常路径
+- 跨文件的数据一致性问题（特别是数据经过转换、存储、再读出的完整路径）
+- 错误处理中被吞掉的失败
+- 并发场景下的竞态条件
+- 资源泄漏
+
+对每个发现，输出：
+[SEVERITY] (confidence: N/10) path/to/file:line — 描述
+
+severity: CRITICAL / WARNING / INFORMATIONAL
+confidence: 1-10
+
+不要给出赞美或"看起来不错"的评论。只报告问题。如果没有发现，输出 "NO FINDINGS"。
+```
+
+**合并规则**：
+- 去重：如果子 agent 的发现与主审查重复，保留置信度更高的那个，标注"独立确认"
+- 去重后合并到主报告
+
+**如果子 agent 失败或超时**：跳过此步骤，注明"对抗性审查不可用"。
+
+### Step 5: 兼容性 + 范围漂移
+
+#### 兼容性影响分析
 
 | 维度 | 检查项 |
 |------|--------|
 | **前端** | UI 组件、样式、路由变化 |
 | **API** | 接口签名、请求/响应格式变化 |
-| **依赖** | package.json、requirements.txt 变化 |
+| **依赖** | 包管理文件变化 |
 | **数据库** | Schema 迁移、数据结构变化 |
 | **配置** | 环境变量、配置文件变化 |
 
-输出格式：
+#### 范围漂移检测
+
+1. 从 PR 描述、commit message 中提取"声明的意图"
+2. 对比 diff 实际改动与声明意图
+3. 检测：
+   - **范围蔓延**：改动超出了声明意图
+   - **需求缺失**：声明了但没实现的部分
+
+输出：
 ```
-| 影响维度 | 评估 | 说明 |
-|---------|------|------|
-| 前端 | ✅/⚠️/❌ | ... |
-| API | ✅/⚠️/❌ | ... |
-```
-
-### Step 4: 重复 PR 检查
-
-根据 PR 内容提取关键词，搜索相关 PR：
-
-```bash
-gh pr list --repo <owner/repo> --state all --search "<keyword1>" --json number,title,state
-gh pr list --repo <owner/repo> --state all --search "<keyword2>" --json number,title,state
-```
-
-关键词来源：
-- PR 标题中的技术术语
-- 涉及的库名（如 `rehype`, `react-markdown`）
-- 功能描述关键词
-
-结论：
-- ✅ 无重复 PR
-- ⚠️ 发现相似 PR（列出并说明差异）
-
-### Step 5: 关联 Issue 与 PR 分析
-
-**5.1 关联 Issue 分析**
-
-从 PR body 中提取关联的 Issue（如 `Closes #xxx`, `Fixes #xxx`, `Resolves #xxx`）：
-
-```bash
-gh issue view <ISSUE_NUM> --repo <owner/repo> --json title,body,state,labels
+范围检查: [CLEAN / DRIFT / MISSING]
+意图: {1 行声明意图}
+交付: {1 行实际改动}
+[如有 drift: 列出超范围改动]
+[如有 missing: 列出未实现需求]
 ```
 
-分析：
-- Issue 的标题和描述
-- Issue 的当前状态
-- Issue 的标签（如 bug, enhancement, breaking-change）
-- PR 是否完整解决了 Issue 描述的问题
-
-**5.2 关联 PR 分析**
-
-查找与当前 PR 相关的其他 PR，分析关系类型：
-
-| 关系类型 | 说明 |
-|---------|------|
-| **替代** | 此 PR 替代了另一个 PR |
-| **互补** | 与另一个 PR 功能互补 |
-| **依赖** | 依赖另一个 PR 先合并 |
-| **冲突** | 与另一个 PR 存在冲突 |
-| **无关** | 仅关键词相似 |
-
-输出格式：
-```
-### 关联 Issue
-- #123: 标题 (状态: open/closed) - 简要说明 PR 如何解决此 Issue
-
-### 关联 PR
-| PR | 状态 | 关系 | 说明 |
-|----|------|------|------|
-| #1510 | OPEN | 互补 | Matrix 渲染改进，类似问题但不同渠道 |
-```
-
-### Step 6: CI 状态检查
-
-```bash
-gh pr checks <PR> --repo <owner/repo> || gh pr view <PR> --repo <owner/repo> --json statusCheckRollup
-```
-
-检查：
-- CI 是否通过（绿色 ✅ / 红色 ❌）
-- 如果失败，列出失败的原因和步骤
-- 是否有阻塞合并的问题
-
-### Step 7: 代码审查
-
-调用 `/review` skill 进行详细代码审查：
-
-```
-/review <PR>
-```
-
-收集审查结果：
-- 阻塞问题（CRITICAL）
-- 建议改进（INFORMATIONAL）
-- 安全隐患
-- 测试覆盖
-
-### Step 8: 检查/设置配置
-
-**检查配置文件是否存在：**
-```bash
-cat ~/.claude/skills/pr-analyze/config.json 2>/dev/null || echo "NOT_FOUND"
-```
-
-**如果配置不存在，使用 AskUserQuestion 询问用户：**
-
-```
-首次使用需要设置 PR 分析报告的存储目录。
-
-A) 使用默认路径：~/.claude/skills/pr-analyze/reports
-B) 使用当前项目目录：./pr-reports
-C) 自定义路径（请在"Other"中输入完整路径）
-```
-
-**写入配置（示例）：**
-```bash
-mkdir -p ~/.claude/skills/pr-analyze
-echo '{"report_dir": "/Users/xxx/pr-reports", "created_at": "2026-03-23T07:00:00Z"}' > ~/.claude/skills/pr-analyze/config.json
-```
-
-### Step 9: 生成并输出报告
-
-**输出原则：报告内容必须同时输出到终端和保存到文件。**
-
-1. **终端输出** - 用户可以直接在对话中看到完整报告
-2. **文件保存** - 报告存档到配置的目录，便于后续查阅
+### Step 6: 生成报告
 
 **1. 准备目录和文件名：**
 ```bash
-# 从 repo 信息生成 slug
 REPO_SLUG=$(echo "$OWNER/$REPO" | tr '/' '-')
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 REPORT_FILE="${REPORT_DIR}/${REPO_SLUG}/pr-${PR_NUMBER}-${TIMESTAMP}.md"
-
-# 创建目录
 mkdir -p "$(dirname "$REPORT_FILE")"
 ```
 
@@ -285,7 +298,15 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 > **作者**: {author}
 > **状态**: {state}
 > **分析时间**: {timestamp}
-> **报告文件**: {report_file_path}
+
+---
+
+## TL;DR
+
+- **目的**: {1 句话概括}
+- **风险**: {低/中/高} — {一句话说明}
+- **决策**: {APPROVE / REQUEST CHANGES / COMMENT}
+- **关键关注点**: {0-2 个，无则写"无"}
 
 ---
 
@@ -293,7 +314,7 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 {1-2 句话概括 PR 的核心目的}
 
-**关联 Issue**: #{issue_num} - {issue_title}（如有）
+**关联 Issue**: #{issue_num} - {issue_title}（如有，无则删除此行）
 
 ---
 
@@ -309,101 +330,88 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 ---
 
-## 3. 重复 PR 检查
-
-✅ 无重复 PR
-
-或
-
-⚠️ 发现相似 PR：
-- #{pr_num}: {title} - {说明为什么相似但不重复}
-
----
-
-## 4. 关联 Issue 与 PR 分析
+## 3. 重复 PR / 关联分析
 
 ### 关联 Issue
 
-- #{issue_num}: {title} (状态: {state}) - {PR 如何解决此 Issue}
-
-（如无关联 Issue 则写"无关联 Issue"）
+{无 / 或列出}
 
 ### 关联 PR
 
 | PR | 状态 | 关系 | 说明 |
 |----|------|------|------|
-| #{num} | OPEN/MERGED/CLOSED | 替代/互补/依赖/冲突/无关 | ... |
+| #{num} | 状态 | 关系 | ... |
 
-（如无关联 PR 则写"无关联 PR"）
-
----
-
-## 5. Merge 状态（CRITICAL）
-
-✅ 无冲突，可合并
-
-或
-
-⛔ **有 Merge 冲突**：
-- `mergeable`: CONFLICTING
-- `mergeStateStatus`: DIRTY
-- **需要作者 rebase 分支到最新的 main 并解决冲突**
-
-或
-
-⚠️ Merge 状态异常：
-- `mergeable`: {状态}
-- `mergeStateStatus`: {状态}
+（无关联 PR 则写"无"）
 
 ---
 
-## 6. CI 状态
+## 4. Merge 状态
 
-✅ CI 通过
-
-或
-
-❌ CI 失败：
-- 失败步骤：{step_name}
-- 失败原因：{reason}
+{✅ 无冲突 / ⛔ 有冲突 / ⚠️ 状态异常}
 
 ---
 
-## 7. 代码审查结果
+## 5. CI 状态
 
-> 由 `/review` skill 生成
+{✅ 通过 / ❌ 失败}
+
+---
+
+## 6. 已有 Review
+
+{列出已有评论中的关键发现，标注评论者。如无则写"无已有评论"。}
+
+---
+
+## 7. 代码审查
+
+### 数据流追踪
+
+{列出追踪到的数据变换点和 roundtrip 验证结果。如发现数据丢失/不一致，标注为 CRITICAL。}
+
+### 主审查发现
 
 - **阻塞问题（CRITICAL）**: N 个
+- **警告（WARNING）**: N 个
 - **建议改进（INFORMATIONAL）**: M 个
-- **关键发现**:
-  1. ...
-  2. ...
+
+{逐条列出，每条格式：}
+[CRITICAL] (confidence: 8/10) path/to/file:line — 描述
+  影响: ...
+  建议: ...
+
+### 对抗性审查
+
+{独立子 agent 的发现，或"对抗性审查不可用"}
+
+### 范围检查
+
+```
+范围检查: CLEAN / DRIFT / MISSING
+意图: ...
+交付: ...
+```
 
 ---
 
-## 8. 总结与建议
+## 8. 总结
 
 ### 最终评估
 
 {对 PR 的整体评价，是否建议合并}
 
-### 需作者修复的问题（blocking）
+### 需作者修复（blocking）
 
-{列出阻塞合并的问题，格式为可直接贴给作者的 review 内容}
+{无 / 或列出}
 
 ### 建议改进（non-blocking）
 
-{列出非阻塞建议，供作者参考}
-
-### 可选扩展
-
-{如果发现可以扩展到其他模块，在此建议}
+{无 / 或列出}
 
 ---
 
 ## 9. Review 操作建议
-
-**重要：用户是 PR 的 reviewer，不能修改代码。以下内容供 reviewer 直接使用。**
 
 ### 推荐操作
 
@@ -411,50 +419,51 @@ mkdir -p "$(dirname "$REPORT_FILE")"
 
 ### 可直接使用的 Review 评论
 
-{生成一段完整的 review 评论文本，reviewer 可以直接复制粘贴到 GitHub PR review 中。格式为英文或中文（根据 PR 作者语言判断）。内容应包含：
-- 肯定 PR 的价值
-- 列出需要作者修复的问题（blocking）
-- 列出建议但非必须的改进（non-blocking）
-- 明确的后续步骤（如 rebase、修缩进等）
-}
+{生成一段完整的 review 评论文本，reviewer 可以直接复制粘贴到 GitHub PR review 中。根据 PR 作者语言选择英文或中文。}
 
 ### 可执行的 gh 命令
 
-如果 reviewer 确认要提交 review，提供可直接执行的命令：
-
 ```bash
-# Request changes（有 blocking 问题时）
+# Request changes
 gh pr review {number} --repo {owner}/{repo} --request-changes --body "..."
 
-# Approve（无 blocking 问题时）
+# Approve
 gh pr review {number} --repo {owner}/{repo} --approve --body "..."
 
-# 仅评论（不需要 approve/request changes 时）
+# 仅评论
 gh pr comment {number} --repo {owner}/{repo} --body "..."
 ```
 
 ---
 
-*报告由 [大铭](https://github.com/yinwm) 的 `/pr-analyze` 生成 (v0.4.0)*
+*报告由 [大铭](https://github.com/yinwm) 的 `/pr-analyze` 生成 (v0.6.0)*
 ```
 
-**3. 保存报告到文件：**
-```bash
-cat > "$REPORT_FILE" << 'EOF'
-{报告内容}
-EOF
-```
+**4. 保存报告到文件。**
 
-**4. 输出报告到终端：**
+**5. 输出报告到终端（完整内容，不是文件路径）。**
 
-**重要：报告必须同时输出到终端和文件，便于用户直接查看。**
-
-使用 Claude 的文本输出直接打印完整报告内容（不是文件路径），格式与保存的文件一致。
-
-**5. 输出确认：**
+**6. 输出确认：**
 ```
 ✅ 报告已保存到: {report_file_path}
 ```
+
+**7. 交互式操作选项：**
+
+报告输出后，使用 AskUserQuestion 询问用户下一步操作：
+
+```
+问题：分析完成，接下来要怎么操作？
+
+A) 直接 approve（我会执行 gh pr approve）
+B) Request changes（我会带上 blocking 问题）
+C) 仅评论（不 approve/request changes）
+D) 只保存报告，不操作
+```
+
+根据用户选择，直接执行对应的 gh 命令。如果用户选择 A（approve），追问是否同时 merge。
+
+**注意：不要自动删除临时目录。** 用户可能在后续操作中需要访问克隆的完整源码（如深挖某个文件、跑测试等）。临时目录路径在报告头部已标注，用户自行决定何时清理。
 
 ---
 
@@ -469,26 +478,46 @@ EOF
 
 **流程：**
 1. 读取当前配置并显示
-2. 使用 AskUserQuestion 询问新路径
-3. 更新 config.json
+2. 使用 `AskUserQuestion` 询问新路径
+3. 更新 `config.json`
 4. 确认修改成功
+
+---
+
+## 严重度校准
+
+### 三级分类
+
+| 级别 | 标准 | 示例 |
+|------|------|------|
+| CRITICAL | 运行时错误/安全漏洞/数据丢失，正常场景可触发，无安全网 | 格式转换丢失字段导致数据损坏 |
+| WARNING | 异常行为，但存在安全网或影响有限 | token 估算偏低但有 retry 机制 |
+| INFORMATIONAL | 设计偏好、可维护性建议 | 文件过长建议拆分 |
+
+**判定口诀**：删除这行代码会引发 bug 且无安全网 → CRITICAL。有安全网兜底 → WARNING。"我会选择不同的做法" → INFORMATIONAL。
+
+### 置信度标注
+
+每个发现必须附带置信度（1-10），详见 `checklist.md`。
+
+**发现格式**：
+```
+[CRITICAL] (confidence: 8/10) path/to/file:42 — 描述
+  影响: ...
+  建议: ...
+```
 
 ---
 
 ## 注意事项
 
 1. **CI 检查失败时**：输出警告，但不阻止分析继续
-2. **无关联 Issue 时**：跳过 Issue 分析步骤
+2. **无关联 Issue 时**：在对应位置写"无"，不要展开空段落
 3. **大型 PR 时**：diff 可能很大，重点关注核心文件
 4. **私有仓库**：确保 `gh` 已认证且有访问权限
 5. **报告目录权限**：确保有写入权限，否则提示用户
 6. **同一 PR 多次分析**：使用时间戳区分，不会覆盖
-
----
-
-## 扩展建议
-
-在分析完成后，如果发现：
-- 改动可以扩展到其他模块（如 skills-page.tsx），主动建议用户
-- 存在安全风险，强调并给出修复建议
-- 测试覆盖不足，提醒用户考虑添加测试
+7. **信息密度优先**：能用一句话说清的不用一段话，能用表格的不用列表
+8. **Clone 失败时**：回退到 diff-only 模式，报告中注明
+9. **不自动删除临时目录**：保留克隆的完整源码供后续操作使用，路径在报告中标注
+10. **已有评论优先**：不重复已有发现，专注于未覆盖的角度
